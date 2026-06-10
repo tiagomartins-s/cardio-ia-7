@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://SEU-BACKEND.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://cardio-ia-7-backend.vercel.app"
       }
     },
     "production": {

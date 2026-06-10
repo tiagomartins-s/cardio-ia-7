@@ -47,7 +47,7 @@ WIFI_PASS = ""
 # URL pública do backend (projeto Vercel da pasta backend/).
 # Em demonstração local, use o IP da máquina rodando uvicorn, ex.:
 # API_URL = "http://192.168.0.10:8765"
-API_URL = "https://SEU-BACKEND.vercel.app"
+API_URL = "https://cardio-ia-7-backend.vercel.app"
 ENDPOINT = API_URL + "/api/iot/leituras"
 DEVICE_ID = "esp32-wokwi-uti01"
 
