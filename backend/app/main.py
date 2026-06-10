@@ -1,55 +1,101 @@
-"""FastAPI app — entry point do CardioIA."""
+"""FastAPI app — núcleo integrador da CardioIA (Fase 7).
+
+Une em uma única API os motores construídos nas fases anteriores:
+  - Fase 2 → `/api/triagem-nlp` (ontologia + classificador de risco textual)
+  - Fase 3 → `/api/iot/*` (ingestão de sinais do ESP32/MicroPython)
+  - Fase 5 → `/api/chat` (chatbot por intents, ex-Watson)
+  - Fase 6 → `/api/predicoes` (pipeline multiagente + Random Forest)
+"""
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import ml_service, repository
+from . import iot_service, ml_service, nlp_service, repository
 from .agents import chat_agent
 from .agents.orchestrator import executar_pipeline
-from .db import init_db
+from .db import backend_info, init_db
 from .schemas import (
     ChatTurnoIn,
     ChatTurnoOut,
+    LeituraIotIn,
+    LeituraIotOut,
     ModelMetrics,
     Paciente,
     PacienteIn,
     PredicaoOut,
     PredicaoRequest,
+    TriagemNlpIn,
+    TriagemNlpOut,
 )
+
+_BOOTSTRAPPED = False
+
+
+def _bootstrap() -> None:
+    """Inicialização idempotente — chamada no import (serverless pode não
+    disparar o protocolo lifespan do ASGI) e no lifespan (uvicorn local)."""
+    global _BOOTSTRAPPED
+    if _BOOTSTRAPPED:
+        return
+    init_db()
+    repository.seed_protocolos_se_vazio()
+    _seed_pacientes_demo()
+    ml_service.status()
+    nlp_service.status()
+    _BOOTSTRAPPED = True
+
+
+def _seed_pacientes_demo() -> None:
+    """Em ambiente efêmero (Vercel + SQLite em /tmp) garante dados de demo."""
+    if repository.listar_pacientes():
+        return
+    demos = [
+        {"nome": "Maria Aparecida Souza", "idade": 71, "sexo": "F",
+         "observacoes": "Hipertensa, em acompanhamento semestral."},
+        {"nome": "João Carlos Pereira", "idade": 64, "sexo": "M",
+         "observacoes": "Histórico de arritmia; usa marcapasso desde 2022."},
+        {"nome": "Antônio Ferreira Lima", "idade": 58, "sexo": "M",
+         "observacoes": "Tabagista, diabético tipo 2."},
+        {"nome": "Helena Cristina Rocha", "idade": 47, "sexo": "F",
+         "observacoes": "Assintomática; check-up anual."},
+    ]
+    for d in demos:
+        repository.criar_paciente(d)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
-    repository.seed_protocolos_se_vazio()
-    # garante que o modelo seja pré-carregado
-    ml_service.status()
+    _bootstrap()
     yield
 
 
 app = FastAPI(
-    title="CardioIA API",
+    title="CardioIA API — Fase 7",
     description=(
-        "API do sistema preditivo multiagente CardioIA — Fase 6. "
-        "Expõe endpoints de gestão (pacientes, protocolos, predições) e "
-        "chatbot do paciente."
+        "Backend integrador da plataforma CardioIA. Conecta as interfaces Web "
+        "(React+Vite) e Mobile (Expo) aos motores de IA: modelo preditivo e "
+        "sistema multiagente (Fase 6), triagem NLP (Fase 2), chatbot (Fase 5) "
+        "e ingestão IoT em MicroPython (Fase 3→7)."
     ),
-    version="1.0.0",
+    version="7.0.0",
     lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_bootstrap()
 
 
 # ---------- Saúde / metadados ----------
@@ -58,7 +104,10 @@ app.add_middleware(
 def health() -> dict:
     return {
         "status": "ok",
+        "ambiente": "vercel" if os.getenv("VERCEL") else "local",
+        "banco": backend_info(),
         "modelo": ml_service.status(),
+        "nlp": nlp_service.status(),
         "ts": datetime.utcnow().isoformat(),
     }
 
@@ -109,7 +158,7 @@ def listar_protocolos():
     return repository.listar_protocolos()
 
 
-# ---------- Predição multiagente ----------
+# ---------- Predição multiagente (Fase 6) ----------
 
 @app.post("/api/predicoes", response_model=PredicaoOut)
 def predizer(req: PredicaoRequest):
@@ -131,7 +180,26 @@ def listar_predicoes(paciente_id: int | None = None, limite: int = 50):
     return repository.listar_predicoes(paciente_id=paciente_id, limite=limite)
 
 
-# ---------- Chatbot ----------
+# ---------- Triagem NLP (Fase 2) ----------
+
+@app.post("/api/triagem-nlp", response_model=TriagemNlpOut)
+def triagem_nlp(req: TriagemNlpIn):
+    return nlp_service.avaliar_texto(req.texto)
+
+
+# ---------- IoT (Fase 3 → MicroPython) ----------
+
+@app.post("/api/iot/leituras", response_model=LeituraIotOut, status_code=status.HTTP_201_CREATED)
+def receber_leitura(leitura: LeituraIotIn):
+    return iot_service.processar_leitura(leitura.model_dump())
+
+
+@app.get("/api/iot/leituras", response_model=list[LeituraIotOut])
+def listar_leituras(limite: int = 50, device_id: str | None = None):
+    return repository.listar_leituras_iot(limite=limite, device_id=device_id)
+
+
+# ---------- Chatbot (Fase 5) ----------
 
 @app.post("/api/chat", response_model=ChatTurnoOut)
 def chat(turno: ChatTurnoIn):

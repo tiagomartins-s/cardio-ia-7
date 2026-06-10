@@ -1,0 +1,7 @@
+# Desenvolvimento/testes locais (sem psycopg2 — em dev usa-se SQLite;
+# instalar psycopg2-binary localmente só se quiser testar contra Postgres)
+fastapi>=0.115
+pydantic>=2.7
+uvicorn>=0.30
+pytest>=8
+httpx>=0.27

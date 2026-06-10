@@ -1,0 +1,8 @@
+# Dependências de produção (Serverless Function na Vercel, Python 3.12).
+# Mantidas mínimas de propósito: a inferência de ML é Python puro
+# (ver app/ml_service.py e app/nlp_service.py) — sem scikit-learn/numpy,
+# o que reduz o bundle da function de >150 MB para poucos MB.
+fastapi>=0.115
+pydantic>=2.7
+# driver Postgres (Vercel Marketplace/Neon); sem POSTGRES_URL o backend usa SQLite
+psycopg2-binary>=2.9

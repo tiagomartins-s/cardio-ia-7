@@ -1,21 +1,25 @@
-"""Wrapper sobre o modelo treinado (Random Forest serializado em joblib).
+"""Motor preditivo da Fase 6, adaptado para serverless (Vercel).
 
-Expõe `prever()` como interface única, usada pelo agente Analista de Risco.
-Se o modelo treinado não estiver disponível, cai num scoring heurístico
-calibrado contra a mesma função geradora — assim o sistema permanece
-operacional em demonstrações sem o joblib presente.
+Em vez de carregar `model.joblib` com scikit-learn (que tornaria a Serverless
+Function pesada demais — sklearn+scipy+numpy somam >150 MB), a Random Forest
+treinada na Fase 6 foi **exportada para JSON** (`ml/export_model.py`) e a
+inferência é feita aqui em **Python puro**: caminhamento das árvores de decisão
+e média das probabilidades das folhas — exatamente o que o
+`RandomForestClassifier.predict_proba` faz.
+
+Se o JSON não existir, cai num scoring heurístico calibrado contra a mesma
+função geradora da base sintética — o sistema permanece operacional.
 """
 
 from __future__ import annotations
 
+import json
+import math
 from pathlib import Path
 from threading import Lock
 from typing import Any
 
-import joblib
-import numpy as np
-
-MODEL_PATH = Path(__file__).resolve().parents[2] / "ml" / "model.joblib"
+RF_JSON_PATH = Path(__file__).resolve().parent / "data" / "rf_model.json"
 
 FEATURE_ORDER = [
     "idade",
@@ -33,7 +37,7 @@ FEATURE_ORDER = [
     "recursos_disponiveis",
 ]
 
-_state: dict[str, Any] = {"model": None, "metrics": None, "loaded": False, "fallback": False}
+_state: dict[str, Any] = {"arvores": None, "metrics": None, "loaded": False, "fallback": False}
 _lock = Lock()
 
 
@@ -41,26 +45,48 @@ def _carregar() -> None:
     with _lock:
         if _state["loaded"]:
             return
-        if MODEL_PATH.exists():
-            payload = joblib.load(MODEL_PATH)
-            _state["model"] = payload["model"]
+        if RF_JSON_PATH.exists():
+            payload = json.loads(RF_JSON_PATH.read_text(encoding="utf-8"))
+            _state["arvores"] = payload["arvores"]
             _state["metrics"] = payload.get("metrics")
             _state["fallback"] = False
         else:
-            _state["model"] = None
+            _state["arvores"] = None
             _state["metrics"] = None
             _state["fallback"] = True
         _state["loaded"] = True
-
-
-def _vetorizar(sinais: dict) -> np.ndarray:
-    return np.array([[float(_coerce(sinais[c])) for c in FEATURE_ORDER]])
 
 
 def _coerce(v: Any) -> float:
     if isinstance(v, bool):
         return 1.0 if v else 0.0
     return float(v)
+
+
+def _prob_arvore(arvore: dict, x: list[float]) -> float:
+    """Caminha uma árvore exportada (arrays paralelos do sklearn) até a folha
+    e devolve a proporção da classe positiva."""
+    feature = arvore["feature"]
+    threshold = arvore["threshold"]
+    left = arvore["left"]
+    right = arvore["right"]
+    value = arvore["value"]  # [neg, pos] por nó
+
+    no = 0
+    while feature[no] >= 0:  # -2 = folha no sklearn
+        if x[feature[no]] <= threshold[no]:
+            no = left[no]
+        else:
+            no = right[no]
+    neg, pos = value[no]
+    total = neg + pos
+    return pos / total if total > 0 else 0.0
+
+
+def _prob_floresta(sinais: dict) -> float:
+    x = [_coerce(sinais[c]) for c in FEATURE_ORDER]
+    arvores = _state["arvores"]
+    return sum(_prob_arvore(a, x) for a in arvores) / len(arvores)
 
 
 def _heuristica(sinais: dict) -> float:
@@ -84,16 +110,15 @@ def _heuristica(sinais: dict) -> float:
         + 1.10 * s["carga_sistema"]
         - 0.85 * s["recursos_disponiveis"]
     )
-    return 1.0 / (1.0 + np.exp(-z))
+    return 1.0 / (1.0 + math.exp(-z))
 
 
 def prever(sinais: dict) -> dict:
     """Retorna probabilidade, classificação e fonte do score."""
     _carregar()
-    if _state["model"] is not None:
-        x = _vetorizar(sinais)
-        prob = float(_state["model"].predict_proba(x)[0, 1])
-        fonte = "random_forest"
+    if _state["arvores"]:
+        prob = float(_prob_floresta(sinais))
+        fonte = "random_forest_json"
     else:
         prob = float(_heuristica(sinais))
         fonte = "heuristica_fallback"
@@ -124,7 +149,8 @@ def metrics() -> dict | None:
 def status() -> dict:
     _carregar()
     return {
-        "carregado": _state["model"] is not None,
+        "carregado": _state["arvores"] is not None,
         "fallback": _state["fallback"],
-        "model_path": str(MODEL_PATH),
+        "model_path": str(RF_JSON_PATH),
+        "n_arvores": len(_state["arvores"]) if _state["arvores"] else 0,
     }

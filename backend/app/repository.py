@@ -1,12 +1,16 @@
-"""Acesso a dados — funções para pacientes, protocolos, predições e chat."""
+"""Acesso a dados — pacientes, protocolos, predições, chat e leituras IoT.
+
+Compatível com SQLite e Postgres via camada `db.Conn` (placeholders `?`,
+contagens com alias, ids via `insert_returning_id`).
+"""
 
 from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any
 
-from .db import get_conn, row_to_dict
+from .db import agora_iso, get_conn, row_to_dict
 from .protocols_seed import PROTOCOLOS_SEED
 
 
@@ -30,9 +34,9 @@ def obter_paciente(paciente_id: int) -> dict | None:
 
 def criar_paciente(p: dict) -> dict:
     with get_conn() as conn:
-        cur = conn.execute(
-            """INSERT INTO pacientes (nome, idade, sexo, documento, telefone, observacoes)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+        novo_id = conn.insert_returning_id(
+            """INSERT INTO pacientes (nome, idade, sexo, documento, telefone, observacoes, criado_em)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (
                 p["nome"],
                 p["idade"],
@@ -40,9 +44,9 @@ def criar_paciente(p: dict) -> dict:
                 p.get("documento"),
                 p.get("telefone"),
                 p.get("observacoes"),
+                agora_iso(),
             ),
         )
-        novo_id = cur.lastrowid
         row = conn.execute(
             "SELECT * FROM pacientes WHERE id = ?", (novo_id,)
         ).fetchone()
@@ -60,7 +64,7 @@ def remover_paciente(paciente_id: int) -> bool:
 def seed_protocolos_se_vazio() -> int:
     """Insere os protocolos seed apenas se a tabela estiver vazia."""
     with get_conn() as conn:
-        n = conn.execute("SELECT COUNT(*) FROM protocolos").fetchone()[0]
+        n = conn.execute("SELECT COUNT(*) AS n FROM protocolos").fetchone()["n"]
         if n > 0:
             return 0
         for p in PROTOCOLOS_SEED:
@@ -99,17 +103,17 @@ def listar_protocolos() -> list[dict]:
 
 def salvar_predicao(paciente_id: int | None, payload: dict) -> int:
     with get_conn() as conn:
-        cur = conn.execute(
-            """INSERT INTO predicoes (paciente_id, probabilidade, classificacao, payload_json)
-               VALUES (?, ?, ?, ?)""",
+        return conn.insert_returning_id(
+            """INSERT INTO predicoes (paciente_id, probabilidade, classificacao, payload_json, criado_em)
+               VALUES (?, ?, ?, ?, ?)""",
             (
                 paciente_id,
                 payload["probabilidade"],
                 payload["classificacao"],
                 json.dumps(payload, ensure_ascii=False, default=_json_default),
+                agora_iso(),
             ),
         )
-    return cur.lastrowid
 
 
 def listar_predicoes(paciente_id: int | None = None, limite: int = 50) -> list[dict]:
@@ -133,14 +137,14 @@ def listar_predicoes(paciente_id: int | None = None, limite: int = 50) -> list[d
     return out
 
 
-# ---------- chat ----------
+# ---------- chat (mensagens + estado de sessão persistido) ----------
 
 def salvar_chat(sessao_id: str, autor: str, conteudo: str, estado: str | None) -> None:
     with get_conn() as conn:
         conn.execute(
-            """INSERT INTO chat_mensagens (sessao_id, autor, conteudo, estado)
-               VALUES (?, ?, ?, ?)""",
-            (sessao_id, autor, conteudo, estado),
+            """INSERT INTO chat_mensagens (sessao_id, autor, conteudo, estado, criado_em)
+               VALUES (?, ?, ?, ?, ?)""",
+            (sessao_id, autor, conteudo, estado, agora_iso()),
         )
 
 
@@ -151,6 +155,83 @@ def historico_chat(sessao_id: str) -> list[dict]:
             (sessao_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def carregar_sessao_chat(sessao_id: str) -> dict | None:
+    """Estado da sessão persistido em banco — obrigatório em serverless, onde
+    cada requisição pode cair em uma instância diferente (sem memória comum)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT estado_json FROM chat_sessoes WHERE sessao_id = ?", (sessao_id,)
+        ).fetchone()
+    if row is None:
+        return None
+    return json.loads(dict(row)["estado_json"])
+
+
+def salvar_sessao_chat(sessao_id: str, estado: dict) -> None:
+    payload = json.dumps(estado, ensure_ascii=False)
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE chat_sessoes SET estado_json = ?, atualizado_em = ? WHERE sessao_id = ?",
+            (payload, agora_iso(), sessao_id),
+        )
+        if cur.rowcount == 0:
+            conn.execute(
+                "INSERT INTO chat_sessoes (sessao_id, estado_json, atualizado_em) VALUES (?, ?, ?)",
+                (sessao_id, payload, agora_iso()),
+            )
+
+
+# ---------- leituras IoT ----------
+
+def salvar_leitura_iot(leitura: dict, avaliacao: dict | None) -> dict:
+    with get_conn() as conn:
+        novo_id = conn.insert_returning_id(
+            """INSERT INTO leituras_iot
+               (device_id, bpm, temperatura_amb, umidade, temperatura_pac,
+                status_edge, alerta, avaliacao_json, criado_em)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                leitura["device_id"],
+                leitura.get("bpm"),
+                leitura.get("temperatura_amb"),
+                leitura.get("umidade"),
+                leitura.get("temperatura_pac"),
+                leitura.get("status_edge"),
+                1 if (avaliacao or {}).get("alerta") else 0,
+                json.dumps(avaliacao, ensure_ascii=False, default=_json_default)
+                if avaliacao
+                else None,
+                agora_iso(),
+            ),
+        )
+        row = conn.execute(
+            "SELECT * FROM leituras_iot WHERE id = ?", (novo_id,)
+        ).fetchone()
+    return _leitura_out(row)
+
+
+def listar_leituras_iot(limite: int = 50, device_id: str | None = None) -> list[dict]:
+    with get_conn() as conn:
+        if device_id:
+            rows = conn.execute(
+                "SELECT * FROM leituras_iot WHERE device_id = ? ORDER BY id DESC LIMIT ?",
+                (device_id, limite),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM leituras_iot ORDER BY id DESC LIMIT ?", (limite,)
+            ).fetchall()
+    return [_leitura_out(r) for r in rows]
+
+
+def _leitura_out(row: Any) -> dict:
+    d = row_to_dict(row)
+    raw = d.pop("avaliacao_json", None)
+    d["avaliacao"] = json.loads(raw) if raw else None
+    d["alerta"] = bool(d.get("alerta"))
+    return d
 
 
 # ---------- helpers ----------
