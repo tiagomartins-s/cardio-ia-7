@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.sqlite3
+backend/app/data/*.sqlite3
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.vercel/
+.expo/
+*.tsbuildinfo
+
+# Expo / EAS
+mobile/android/
+mobile/ios/
+
+# Ambiente
+.env
+.env.local
+.env*.local
+
+# SO / editor
+.DS_Store
+Thumbs.db

@@ -1,0 +1,56 @@
+{
+  "accuracy": 0.75625,
+  "roc_auc": 0.8152462278229149,
+  "confusion_matrix": [
+    [
+      508,
+      144
+    ],
+    [
+      51,
+      97
+    ]
+  ],
+  "classification_report": {
+    "0": {
+      "precision": 0.9087656529516994,
+      "recall": 0.7791411042944786,
+      "f1-score": 0.8389760528488852,
+      "support": 652.0
+    },
+    "1": {
+      "precision": 0.4024896265560166,
+      "recall": 0.6554054054054054,
+      "f1-score": 0.4987146529562982,
+      "support": 148.0
+    },
+    "accuracy": 0.75625,
+    "macro avg": {
+      "precision": 0.6556276397538581,
+      "recall": 0.717273254849942,
+      "f1-score": 0.6688453529025917,
+      "support": 800.0
+    },
+    "weighted avg": {
+      "precision": 0.8151045880684982,
+      "recall": 0.75625,
+      "f1-score": 0.7760276938687567,
+      "support": 800.0
+    }
+  },
+  "feature_importance": {
+    "idade": 0.3867800299780172,
+    "dor_toracica": 0.09725371256879575,
+    "frequencia_cardiaca": 0.07093344111304109,
+    "carga_sistema": 0.06403340776581917,
+    "recursos_disponiveis": 0.06212833367925835,
+    "pressao_sistolica": 0.05652415996026712,
+    "glicemia": 0.05545558741322305,
+    "spo2": 0.05115719054094932,
+    "pressao_diastolica": 0.0486704870842229,
+    "historico_arritmia": 0.03593854491630847,
+    "historico_infarto": 0.03033941398961884,
+    "tabagista": 0.023682821690875638,
+    "diabetico": 0.017102869299603293
+  }
+}
