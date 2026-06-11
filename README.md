@@ -19,7 +19,7 @@
 |------|-----|
 | 🌐 Web (Vercel) | <https://cardio-ia-7-web.vercel.app> |
 | ⚙️ API (Vercel) | <https://cardio-ia-7-backend.vercel.app/api/health> |
-| 📱 Build APK (Expo/EAS) | `https://expo.dev/accounts/PREENCHER/projects/cardio-ia-7/builds/PREENCHER` |
+| 📱 Build APK (Expo/EAS) | <https://expo.dev/accounts/tiagomartins-s/projects/cardio-ia-7/builds/c462beab-95d8-4973-8fa4-aaf1a2fdc359> |
 | 📡 Simulação Wokwi (MicroPython) | `https://wokwi.com/projects/PREENCHER` |
 | 🎬 Vídeo demonstrativo | `https://PREENCHER` |
 

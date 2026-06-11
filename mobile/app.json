@@ -27,8 +27,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "85f2f79c-d1c2-4744-9e5a-706c0907e668"
       }
-    }
+    },
+    "owner": "tiagomartins-s"
   }
 }
