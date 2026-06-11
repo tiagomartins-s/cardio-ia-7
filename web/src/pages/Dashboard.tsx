@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, API_URL, type Health, type LeituraIot, type Paciente, type PredicaoHistorico } from '../lib/api'
 import RiskBadge from '../components/RiskBadge'
 import Sparkline from '../components/Sparkline'
+import { sticky, usePollRequestId } from '../hooks/usePolling'
 
 const POLL_MS = 5000
 
@@ -11,22 +12,29 @@ export default function Dashboard() {
   const [predicoes, setPredicoes] = useState<PredicaoHistorico[]>([])
   const [leituras, setLeituras] = useState<LeituraIot[]>([])
   const [erro, setErro] = useState('')
+  const { begin, isLatest } = usePollRequestId()
 
   async function carregar() {
-    try {
-      const [h, p, pr, l] = await Promise.all([
-        api.health(),
-        api.pacientes(),
-        api.predicoes(8),
-        api.leiturasIot(30),
-      ])
-      setHealth(h)
-      setPacientes(p)
-      setPredicoes(pr)
-      setLeituras(l)
+    const reqId = begin()
+    const [hR, pR, prR, lR] = await Promise.allSettled([
+      api.health(),
+      api.pacientes(),
+      api.predicoes(8),
+      api.leiturasIot(30),
+    ])
+    if (!isLatest(reqId)) return
+
+    const ok = [hR, pR, prR, lR].filter((r) => r.status === 'fulfilled').length
+    if (hR.status === 'fulfilled') setHealth(hR.value)
+    if (pR.status === 'fulfilled') setPacientes((prev) => sticky(pR.value, prev))
+    if (prR.status === 'fulfilled') setPredicoes((prev) => sticky(prR.value, prev))
+    if (lR.status === 'fulfilled') setLeituras((prev) => sticky(lR.value, prev))
+
+    if (ok > 0) {
       setErro('')
-    } catch (e) {
-      setErro(`Não foi possível falar com a API (${API_URL}). ${String(e)}`)
+    } else {
+      const falha = [hR, pR, prR, lR].find((r) => r.status === 'rejected')
+      setErro(`Não foi possível falar com a API (${API_URL}). ${String(falha && 'reason' in falha ? falha.reason : '')}`)
     }
   }
 

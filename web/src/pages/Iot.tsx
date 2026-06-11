@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react'
 import { api, type LeituraIot } from '../lib/api'
 import Sparkline from '../components/Sparkline'
+import { sticky, usePollRequestId } from '../hooks/usePolling'
 
 export default function Iot() {
   const [leituras, setLeituras] = useState<LeituraIot[]>([])
   const [erro, setErro] = useState('')
+  const { begin, isLatest } = usePollRequestId()
 
   async function carregar() {
+    const reqId = begin()
     try {
-      setLeituras(await api.leiturasIot(50))
+      const dados = await api.leiturasIot(50)
+      if (!isLatest(reqId)) return
+      setLeituras((prev) => sticky(dados, prev))
       setErro('')
     } catch (e) {
+      if (!isLatest(reqId)) return
       setErro(String(e))
     }
   }

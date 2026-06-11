@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any
 
 from .db import agora_iso, get_conn, row_to_dict
+from .live_cache import mesclar_leituras, mesclar_predicoes, registrar_leitura, registrar_predicao
 from .protocols_seed import PROTOCOLOS_SEED
 
 
@@ -101,9 +102,15 @@ def listar_protocolos() -> list[dict]:
 
 # ---------- predições ----------
 
+def _predicao_out(row: Any) -> dict:
+    d = row_to_dict(row)
+    d["payload"] = json.loads(d.pop("payload_json"))
+    return d
+
+
 def salvar_predicao(paciente_id: int | None, payload: dict) -> int:
     with get_conn() as conn:
-        return conn.insert_returning_id(
+        novo_id = conn.insert_returning_id(
             """INSERT INTO predicoes (paciente_id, probabilidade, classificacao, payload_json, criado_em)
                VALUES (?, ?, ?, ?, ?)""",
             (
@@ -114,6 +121,12 @@ def salvar_predicao(paciente_id: int | None, payload: dict) -> int:
                 agora_iso(),
             ),
         )
+        row = conn.execute(
+            "SELECT * FROM predicoes WHERE id = ?", (novo_id,)
+        ).fetchone()
+    out = _predicao_out(row)
+    registrar_predicao(out)
+    return novo_id
 
 
 def listar_predicoes(paciente_id: int | None = None, limite: int = 50) -> list[dict]:
@@ -129,11 +142,9 @@ def listar_predicoes(paciente_id: int | None = None, limite: int = 50) -> list[d
                 "ORDER BY criado_em DESC LIMIT ?",
                 (paciente_id, limite),
             ).fetchall()
-    out = []
-    for r in rows:
-        d = dict(r)
-        d["payload"] = json.loads(d.pop("payload_json"))
-        out.append(d)
+    out = [_predicao_out(r) for r in rows]
+    if paciente_id is None:
+        return mesclar_predicoes(out, limite)
     return out
 
 
@@ -209,7 +220,9 @@ def salvar_leitura_iot(leitura: dict, avaliacao: dict | None) -> dict:
         row = conn.execute(
             "SELECT * FROM leituras_iot WHERE id = ?", (novo_id,)
         ).fetchone()
-    return _leitura_out(row)
+    out = _leitura_out(row)
+    registrar_leitura(out)
+    return out
 
 
 def listar_leituras_iot(limite: int = 50, device_id: str | None = None) -> list[dict]:
@@ -223,7 +236,10 @@ def listar_leituras_iot(limite: int = 50, device_id: str | None = None) -> list[
             rows = conn.execute(
                 "SELECT * FROM leituras_iot ORDER BY id DESC LIMIT ?", (limite,)
             ).fetchall()
-    return [_leitura_out(r) for r in rows]
+    out = [_leitura_out(r) for r in rows]
+    if device_id is None:
+        return mesclar_leituras(out, limite)
+    return out
 
 
 def _leitura_out(row: Any) -> dict:

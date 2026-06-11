@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { api, type Health, type LeituraIot, type PredicaoHistorico } from '../api'
 import { cores, corStatus } from '../theme'
@@ -11,16 +11,30 @@ export default function DashboardScreen({ usuario }: { usuario: string }) {
   const [health, setHealth] = useState<Health | null>(null)
   const [erro, setErro] = useState('')
   const [atualizando, setAtualizando] = useState(false)
+  const pollId = useRef(0)
 
   const carregar = useCallback(async () => {
-    try {
-      const [l, p, h] = await Promise.all([api.leiturasIot(20), api.predicoes(5), api.health()])
-      setLeituras(l)
-      setPredicoes(p)
-      setHealth(h)
-      setErro('')
-    } catch (e) {
-      setErro(`Sem conexão com a API: ${String(e)}`)
+    const reqId = ++pollId.current
+    const [lR, pR, hR] = await Promise.allSettled([
+      api.leiturasIot(20),
+      api.predicoes(5),
+      api.health(),
+    ])
+    if (reqId !== pollId.current) return
+
+    const ok = [lR, pR, hR].filter((r) => r.status === 'fulfilled').length
+    if (lR.status === 'fulfilled') {
+      setLeituras((prev) => (lR.value.length > 0 ? lR.value : prev))
+    }
+    if (pR.status === 'fulfilled') {
+      setPredicoes((prev) => (pR.value.length > 0 ? pR.value : prev))
+    }
+    if (hR.status === 'fulfilled') setHealth(hR.value)
+
+    if (ok > 0) setErro('')
+    else {
+      const falha = [lR, pR, hR].find((r) => r.status === 'rejected')
+      setErro(`Sem conexão com a API: ${String(falha && 'reason' in falha ? falha.reason : '')}`)
     }
   }, [])
 
