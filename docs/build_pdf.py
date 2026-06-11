@@ -197,7 +197,8 @@ def main():
     story.append(Paragraph("Relatório Técnico — CardioIA Fase 7:<br/>Coração Sob Controle", H1))
     story.append(Paragraph(
         "Curso de Inteligência Artificial — FIAP · Fase 7 · Junho/2026<br/>"
-        "Grupo: RM560639 · RM559625 · RM559923 <i>(+ preencher nomes no README)</i>", SUB))
+        "Grupo: Tiago Martins da Silva (RM560639) · Mauricio Cortes Moreira (RM559923) · "
+        "Lucas Costa dos Santos Castro (RM559625)", SUB))
     story.append(Spacer(1, 4 * mm))
 
     story.append(Paragraph("1. Visão geral", H2))

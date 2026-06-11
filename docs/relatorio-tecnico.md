@@ -1,7 +1,7 @@
 # Relatório Técnico — CardioIA Fase 7: Coração Sob Controle
 
 **Curso:** Inteligência Artificial — FIAP · **Fase 7** · Junho/2026
-**Grupo:** RM560639 · RM559625 · RM559923 _(+ preencher)_
+**Grupo:** Tiago Martins da Silva (RM560639) · Mauricio Cortes Moreira (RM559923) · Lucas Costa dos Santos Castro (RM559625)
 
 ---
 

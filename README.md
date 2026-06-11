@@ -8,10 +8,9 @@
 
 | Nome | RM |
 |------|----|
-| _preencher_ | RM560639 |
-| _preencher_ | RM559625 |
-| _preencher_ | RM559923 |
-| _preencher_ | _RM_ |
+| Tiago Martins da Silva | rm560639 |
+| Mauricio Cortes Moreira | rm559923 |
+| Lucas Costa dos Santos Castro | rm559625 |
 
 ## 🔗 URLs da entrega
 
@@ -21,9 +20,7 @@
 | ⚙️ API (Vercel) | <https://cardio-ia-7-backend.vercel.app/api/health> |
 | 📱 Build APK (Expo/EAS) | <https://expo.dev/accounts/tiagomartins-s/projects/cardio-ia-7/builds/c462beab-95d8-4973-8fa4-aaf1a2fdc359> |
 | 📡 Simulação Wokwi (MicroPython) | <https://wokwi.com/projects/466491403812407297> |
-| 🎬 Vídeo demonstrativo | `https://PREENCHER` |
-
-> ⚠️ Os placeholders acima são substituídos após os deploys — passo a passo completo em [TAREFAS-HUMANAS.md](TAREFAS-HUMANAS.md).
+| 🎬 Vídeo demonstrativo | <https://www.youtube.com/watch?v=YjJOWZ9Pcuw> |
 
 ## 🏗️ Arquitetura
 
@@ -75,7 +72,7 @@ cardio-ia-7/
 ├── mobile/           # React Native + Expo (app.json + eas.json perfil preview → APK)
 ├── iot/              # MicroPython p/ Wokwi (main.py, diagram.json, ssd1306.py)
 ├── ml/               # modelo da Fase 6 + export_model.py (joblib → JSON)
-└── docs/             # relatório técnico (PDF), roteiro do vídeo, prints
+└── docs/             # relatório técnico (PDF) e prints
 ```
 
 ## 🚀 Como executar localmente
@@ -147,9 +144,27 @@ Mobile: `eas build -p android --profile preview` gera o `.apk` na nuvem do Expo
 
 ## 📸 Prints do deploy
 
-> _Adicionar em `docs/prints/` após os deploys (ver TAREFAS-HUMANAS.md):_
-> deploy Vercel concluído (web e backend), build EAS com QR Code, app instalado
-> no dispositivo, simulação Wokwi rodando.
+Evidências dos deploys e da aplicação em execução (arquivos em `docs/prints/`).
+
+### Web — Vercel
+
+![Deploy da web na Vercel](docs/prints/deploy-web.png)
+
+### API — Vercel
+
+![Deploy do backend na Vercel](docs/prints/deploy-api.png)
+
+### Mobile — EAS (APK)
+
+![Build Android no Expo EAS](docs/prints/deploy-mobile.png)
+
+### Mobile — app no dispositivo
+
+![Dashboard do app CardioIA no celular](docs/prints/print-mobile.png)
+
+### IoT — simulação Wokwi (ESP32)
+
+![Simulação MicroPython no Wokwi com sensor e OLED](docs/prints/print-wokwi.png)
 
 ## 🧬 O que veio de cada fase
 
@@ -165,8 +180,6 @@ Mobile: `eas build -p android --profile preview` gera o `.apk` na nuvem do Expo
 ## 📄 Documentos
 
 - [docs/relatorio-tecnico.md](docs/relatorio-tecnico.md) / `docs/relatorio-tecnico.pdf` — relatório (≤5 páginas) com diagrama de arquitetura
-- [docs/script-video.md](docs/script-video.md) — roteiro do vídeo (≤5 min)
-- [TAREFAS-HUMANAS.md](TAREFAS-HUMANAS.md) — checklist do que falta fazer manualmente
 
 ---
 
