@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
-import { api, type Protocolo } from '../lib/api'
+import { api, type GatilhoProtocolo, type Protocolo } from '../lib/api'
 import RiskBadge from '../components/RiskBadge'
+
+function formatGatilho(g: GatilhoProtocolo): string {
+  const valor =
+    typeof g.valor === 'boolean' ? (g.valor ? 'sim' : 'não') : String(g.valor)
+  return `${g.campo.replace(/_/g, ' ')} ${g.op} ${valor}`
+}
 
 export default function Protocolos() {
   const [protocolos, setProtocolos] = useState<Protocolo[]>([])
@@ -30,8 +36,8 @@ export default function Protocolos() {
             </div>
             <p className="muted">{p.descricao}</p>
             <div className="chips">
-              {p.gatilhos.map((g) => (
-                <span key={g} className="chip">{g}</span>
+              {p.gatilhos.map((g, i) => (
+                <span key={`${g.campo}-${g.op}-${i}`} className="chip">{formatGatilho(g)}</span>
               ))}
             </div>
           </div>

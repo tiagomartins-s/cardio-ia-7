@@ -137,9 +137,15 @@ export interface Health {
   nlp: { regras_ontologia: number; classificador_carregado: boolean };
 }
 
+export interface GatilhoProtocolo {
+  campo: string;
+  op: string;
+  valor: string | number | boolean;
+}
+
 export interface Protocolo extends ProtocoloItem {
   id: number;
-  gatilhos: string[];
+  gatilhos: GatilhoProtocolo[];
 }
 
 // ---------- chamadas ----------
